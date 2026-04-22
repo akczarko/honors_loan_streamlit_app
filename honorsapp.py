@@ -26,6 +26,16 @@ datasets = {
 }
 
 # ----------------------------
+# CLEAN COLUMN NAMES (fixes KeyError issues)
+# ----------------------------
+train.columns = train.columns.str.strip()
+m1.columns = m1.columns.str.strip()
+m2.columns = m2.columns.str.strip()
+m3.columns = m3.columns.str.strip()
+
+feature_columns = [col.strip() for col in feature_columns]
+
+# ----------------------------
 # PSI Function
 # ----------------------------
 def calculate_psi(expected, actual, bins=10):
@@ -54,7 +64,12 @@ dataset_name = st.selectbox(
 )
 
 data = datasets[dataset_name]
-data_model = data[feature_columns]
+
+# ----------------------------
+# SAFE FEATURE SELECTION (prevents KeyError)
+# ----------------------------
+available_features = [col for col in feature_columns if col in data.columns]
+data_model = data[available_features]
 
 # ----------------------------
 # PSI TABLE
@@ -64,8 +79,9 @@ st.subheader("PSI (Population Stability Index)")
 psi_results = []
 
 for col in feature_columns:
-    psi = calculate_psi(train[col], data[col])
-    psi_results.append([col, psi])
+    if col in train.columns and col in data.columns:
+        psi = calculate_psi(train[col], data[col])
+        psi_results.append([col, psi])
 
 psi_df = pd.DataFrame(psi_results, columns=["Feature", "PSI"])
 st.dataframe(psi_df)
@@ -75,7 +91,7 @@ st.dataframe(psi_df)
 # ----------------------------
 st.subheader("Feature Distribution Comparison")
 
-feature = st.selectbox("Select Feature", feature_columns)
+feature = st.selectbox("Select Feature", available_features)
 
 fig, ax = plt.subplots()
 
@@ -88,7 +104,7 @@ ax.legend()
 st.pyplot(fig)
 
 # ----------------------------
-# Model Performance (placeholder)
+# Model Performance Over Time (placeholder)
 # ----------------------------
 st.subheader("Model Performance Over Time")
 
@@ -100,11 +116,15 @@ performance = pd.DataFrame({
 st.line_chart(performance.set_index("Dataset"))
 
 # ----------------------------
-# Retraining Trigger
+# Retraining Trigger Logic
 # ----------------------------
 st.subheader("Retraining Status")
 
-avg_psi = psi_df["PSI"].mean()
+if len(psi_df) > 0:
+    avg_psi = psi_df["PSI"].mean()
+else:
+    avg_psi = 0
+
 final_accuracy = performance["Accuracy"].iloc[-1]
 
 if avg_psi > 0.2 or final_accuracy < 0.8:
