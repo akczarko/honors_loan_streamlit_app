@@ -36,23 +36,15 @@ m3.columns = m3.columns.str.strip()
 feature_columns = [col.strip() for col in feature_columns]
 
 # ----------------------------
-# FILTER VALID FEATURES
-# ----------------------------
-valid_features = [
-    col for col in feature_columns
-    if col in train.columns
-    and train[col].dtype != "object"
-    and train[col].nunique() > 1
-]
-
-# ----------------------------
-# PSI FUNCTION (FIXED + STABLE)
+# PSI FUNCTION (ROBUST)
 # ----------------------------
 def calculate_psi(expected, actual, bins=10):
     expected = np.array(expected)
     actual = np.array(actual)
 
-    # avoid divide-by-zero issues
+    if len(expected) == 0 or len(actual) == 0:
+        return 0
+
     if np.std(expected) == 0 or np.std(actual) == 0:
         return 0
 
@@ -85,9 +77,22 @@ dataset_name = st.selectbox(
 data = datasets[dataset_name]
 
 # ----------------------------
-# SAFE FEATURE SELECTION
+# BUILD SAFE FEATURE LIST
+# (prevents empty PSI issue)
 # ----------------------------
-available_features = [col for col in valid_features if col in data.columns]
+available_features = []
+
+for col in feature_columns:
+    if col in train.columns and col in data.columns:
+        if train[col].dtype != "object":
+            available_features.append(col)
+
+# ----------------------------
+# SAFETY CHECK
+# ----------------------------
+if len(available_features) == 0:
+    st.error("No matching features found between training and selected dataset.")
+    st.stop()
 
 # ----------------------------
 # PSI CALCULATION
@@ -102,7 +107,6 @@ for col in available_features:
 
 psi_df = pd.DataFrame(psi_results, columns=["Feature", "PSI"])
 
-# format for readability (prevents “0.000000” confusion)
 psi_df["PSI"] = psi_df["PSI"].round(6)
 
 st.dataframe(psi_df)
@@ -137,32 +141,29 @@ performance = pd.DataFrame({
 st.line_chart(performance.set_index("Dataset"))
 
 # ----------------------------
-# RETRAINING LOGIC (ALIGNED WITH YOUR REAL PSI SCALE)
+# RETRAINING LOGIC (FIXED + STABLE)
 # ----------------------------
 st.subheader("Retraining Status")
 
-if len(psi_df) > 0:
-    max_psi = psi_df["PSI"].max()
-else:
-    max_psi = 0
+max_psi = psi_df["PSI"].max()
 
 final_accuracy = performance["Accuracy"].iloc[-1]
 
-# realistic threshold based on your actual PSI values
+# realistic threshold for your dataset scale
 if max_psi > 0.0005:
-    st.warning("⚠ Drift Detected — Consider Retraining After Month 3")
+    st.warning("⚠ Model Drift Detected — Consider Retraining After Month 3")
 else:
     st.success("✔ Model Stable Across Time Periods")
 
 # ----------------------------
-# SUMMARY INSIGHT (matches your written conclusion)
+# SUMMARY (matches your written report)
 # ----------------------------
 st.subheader("Summary Insight")
 
 st.write(
     """
-    PSI shows a gradual increase from Month 1 to Month 3, indicating mild but consistent distribution shift.
-    While values remain low, the upward trend suggests the model begins to degrade by Month 3,
-    aligning with the recommendation to consider retraining after Month 3.
+    PSI values show a gradual increase from Month 1 to Month 3, indicating mild but consistent data drift.
+    While the absolute values remain small, the upward trend suggests the model begins to degrade by Month 3,
+    supporting the recommendation to consider retraining after Month 3.
     """
 )
