@@ -26,7 +26,7 @@ datasets = {
 }
 
 # ----------------------------
-# CLEAN COLUMN NAMES (fixes KeyError issues)
+# CLEAN COLUMN NAMES
 # ----------------------------
 train.columns = train.columns.str.strip()
 m1.columns = m1.columns.str.strip()
@@ -36,7 +36,18 @@ m3.columns = m3.columns.str.strip()
 feature_columns = [col.strip() for col in feature_columns]
 
 # ----------------------------
-# PSI Function
+# FILTER VALID FEATURES
+# (removes constants, missing cols, etc.)
+# ----------------------------
+valid_features = [
+    col for col in feature_columns
+    if col in train.columns
+    and train[col].dtype != "object"
+    and train[col].nunique() > 1
+]
+
+# ----------------------------
+# PSI FUNCTION
 # ----------------------------
 def calculate_psi(expected, actual, bins=10):
     expected = np.array(expected)
@@ -54,7 +65,7 @@ def calculate_psi(expected, actual, bins=10):
     return psi
 
 # ----------------------------
-# Streamlit UI
+# STREAMLIT UI
 # ----------------------------
 st.title("📊 Model Monitoring Dashboard")
 
@@ -66,10 +77,9 @@ dataset_name = st.selectbox(
 data = datasets[dataset_name]
 
 # ----------------------------
-# SAFE FEATURE SELECTION (prevents KeyError)
+# SAFE FEATURE SELECTION
 # ----------------------------
-available_features = [col for col in feature_columns if col in data.columns]
-data_model = data[available_features]
+available_features = [col for col in valid_features if col in data.columns]
 
 # ----------------------------
 # PSI TABLE
@@ -78,16 +88,15 @@ st.subheader("PSI (Population Stability Index)")
 
 psi_results = []
 
-for col in feature_columns:
-    if col in train.columns and col in data.columns:
-        psi = calculate_psi(train[col], data[col])
-        psi_results.append([col, psi])
+for col in available_features:
+    psi = calculate_psi(train[col], data[col])
+    psi_results.append([col, psi])
 
 psi_df = pd.DataFrame(psi_results, columns=["Feature", "PSI"])
 st.dataframe(psi_df)
 
 # ----------------------------
-# Feature Distribution
+# FEATURE DISTRIBUTION
 # ----------------------------
 st.subheader("Feature Distribution Comparison")
 
@@ -104,7 +113,7 @@ ax.legend()
 st.pyplot(fig)
 
 # ----------------------------
-# Model Performance Over Time (placeholder)
+# MODEL PERFORMANCE (placeholder)
 # ----------------------------
 st.subheader("Model Performance Over Time")
 
@@ -116,18 +125,18 @@ performance = pd.DataFrame({
 st.line_chart(performance.set_index("Dataset"))
 
 # ----------------------------
-# Retraining Trigger Logic
+# RETRAINING LOGIC (FIXED)
 # ----------------------------
 st.subheader("Retraining Status")
 
 if len(psi_df) > 0:
-    avg_psi = psi_df["PSI"].mean()
+    max_psi = psi_df["PSI"].max()
 else:
-    avg_psi = 0
+    max_psi = 0
 
 final_accuracy = performance["Accuracy"].iloc[-1]
 
-if avg_psi > 0.2 or final_accuracy < 0.8:
-    st.error("⚠ Retraining Triggered")
+if max_psi > 0.2:
+    st.error("⚠ Retraining Triggered (Data Drift Detected)")
 else:
     st.success("✔ No Retraining Needed")
