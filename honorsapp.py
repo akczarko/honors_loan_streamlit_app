@@ -11,12 +11,12 @@ model = pickle.load(open("honors_model.pkl", "rb"))
 feature_columns = pickle.load(open("honors_feature_columns.pkl", "rb"))
 
 # ----------------------------
-# Load datasets
+# Load datasets (ROOT LEVEL FILES)
 # ----------------------------
-train = pd.read_csv("data/train.csv")
-m1 = pd.read_csv("data/month1.csv")
-m2 = pd.read_csv("data/month2.csv")
-m3 = pd.read_csv("data/month3.csv")
+train = pd.read_csv("train.csv")
+m1 = pd.read_csv("month1.csv")
+m2 = pd.read_csv("month2.csv")
+m3 = pd.read_csv("month3.csv")
 
 datasets = {
     "Training": train,
@@ -54,8 +54,6 @@ dataset_name = st.selectbox(
 )
 
 data = datasets[dataset_name]
-
-# Ensure only model features used
 data_model = data[feature_columns]
 
 # ----------------------------
@@ -73,7 +71,7 @@ psi_df = pd.DataFrame(psi_results, columns=["Feature", "PSI"])
 st.dataframe(psi_df)
 
 # ----------------------------
-# Feature Distribution Plot
+# Feature Distribution
 # ----------------------------
 st.subheader("Feature Distribution Comparison")
 
@@ -90,7 +88,7 @@ ax.legend()
 st.pyplot(fig)
 
 # ----------------------------
-# Model Performance Over Time (placeholder)
+# Model Performance (placeholder)
 # ----------------------------
 st.subheader("Model Performance Over Time")
 
