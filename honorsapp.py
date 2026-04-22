@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 model = pickle.load(open("honors_model.pkl", "rb"))
 
 # ----------------------------
-# LOAD DATASETS (for plots only)
+# LOAD DATASETS
 # ----------------------------
 train = pd.read_csv("train.csv")
 m1 = pd.read_csv("month1.csv")
@@ -25,7 +25,7 @@ datasets = {
 }
 
 # ----------------------------
-# YOUR REAL PSI TABLE (FROM NOTEBOOK)
+# PSI TABLE (FROM NOTEBOOK)
 # ----------------------------
 psi_table = pd.DataFrame({
     "Feature": ["Monthly_Gross_Income", "FICO_score", "Employment_Status"],
@@ -47,16 +47,29 @@ dataset_name = st.selectbox(
 data = datasets[dataset_name]
 
 # ----------------------------
-# PSI TABLE DISPLAY (REQUIRED BY ASSIGNMENT)
+# SHOW PSI ONLY FOR SELECTED DATASET
 # ----------------------------
-st.subheader("PSI Values by Feature and Month")
+st.subheader(f"PSI Values for {dataset_name}")
 
-st.dataframe(psi_table)
+if dataset_name == "Training":
+    st.info("Training set is baseline → PSI = 0 by definition")
+    display_psi = pd.DataFrame({
+        "Feature": psi_table["Feature"],
+        "PSI": [0, 0, 0]
+    })
+elif dataset_name == "Month 1":
+    display_psi = psi_table[["Feature", "Month 1"]].rename(columns={"Month 1": "PSI"})
+elif dataset_name == "Month 2":
+    display_psi = psi_table[["Feature", "Month 2"]].rename(columns={"Month 2": "PSI"})
+else:
+    display_psi = psi_table[["Feature", "Month 3"]].rename(columns={"Month 3": "PSI"})
+
+st.dataframe(display_psi)
 
 # ----------------------------
-# FEATURE DISTRIBUTION PLOTS
+# FEATURE DISTRIBUTION (DYNAMIC)
 # ----------------------------
-st.subheader("Feature Distribution Plots")
+st.subheader("Feature Distribution")
 
 feature = st.selectbox(
     "Select Feature",
@@ -65,20 +78,16 @@ feature = st.selectbox(
 
 fig, ax = plt.subplots()
 
-if feature == "Monthly_Gross_Income":
-    ax.hist(train[feature], alpha=0.5, label="Training")
-    ax.hist(m3[feature], alpha=0.5, label="Month 3")
-else:
-    ax.hist(train[feature], alpha=0.5, label="Training")
-    ax.hist(m3[feature], alpha=0.5, label="Month 3")
+ax.hist(train[feature], alpha=0.5, label="Training")
+ax.hist(data[feature], alpha=0.5, label=dataset_name)
 
-ax.set_title(f"Distribution of {feature}")
+ax.set_title(f"{feature} Distribution")
 ax.legend()
 
 st.pyplot(fig)
 
 # ----------------------------
-# MODEL PERFORMANCE DECAY
+# MODEL PERFORMANCE
 # ----------------------------
 st.subheader("Model Performance Over Time")
 
@@ -90,29 +99,42 @@ performance = pd.DataFrame({
 st.line_chart(performance.set_index("Dataset"))
 
 # ----------------------------
-# RETRAINING RULE (BASED ON YOUR REAL PSI)
+# RETRAINING RULE (NOW DYNAMIC!)
 # ----------------------------
 st.subheader("Retraining Status")
 
-max_psi = psi_table[["Month 1", "Month 2", "Month 3"]].max().max()
+if dataset_name == "Training":
+    st.success("✔ Baseline dataset — No retraining needed")
 
-if max_psi > 0.1:
-    st.error("⚠ Retraining Triggered (High Drift Detected)")
-elif max_psi > 0.05:
-    st.warning("⚠ Moderate Drift — Monitor Model")
+elif dataset_name == "Month 1":
+    max_psi = psi_table["Month 1"].max()
+    if max_psi > 0.1:
+        st.warning("⚠ Retraining Consideration")
+    else:
+        st.success("✔ Stable")
+
+elif dataset_name == "Month 2":
+    max_psi = psi_table["Month 2"].max()
+    if max_psi > 0.1:
+        st.warning("⚠ Retraining Consideration")
+    else:
+        st.success("✔ Stable")
+
 else:
-    st.success("✔ No Retraining Needed")
+    max_psi = psi_table["Month 3"].max()
+    if max_psi > 0.1:
+        st.error("⚠ RETRAINING TRIGGERED")
+    else:
+        st.success("✔ Stable")
 
 # ----------------------------
-# INSIGHT (MATCHES YOUR WRITE-UP)
+# INSIGHT
 # ----------------------------
 st.subheader("Summary Insight")
 
 st.write(
-    """
-    PSI results indicate a clear upward trend across all features from Month 1 to Month 3,
-    particularly in Monthly_Gross_Income and FICO_score. This suggests gradual population drift
-    and supports the conclusion that model performance begins degrading by Month 3,
-    making retraining after Month 3 a reasonable decision.
+    f"""
+    For {dataset_name}, PSI indicates increasing drift over time across key features.
+    The highest drift is observed in Month 3, supporting model degradation trends.
     """
 )
